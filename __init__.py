@@ -42,26 +42,31 @@ def process_cards():
             "query": r'''"note:Chinese (advanced)\_" "example 1:_*"''',
             "tag_prefix": "duplicate-audio::example1::",
             "card_name": "Listening Example 1",
+            "audio_field": "Example 1 Audio",
         },
         "Example 2": {
             "query": r'''"note:Chinese (advanced)\_" "example 2:_*"''',
             "tag_prefix": "duplicate-audio::example2::",
             "card_name": "Listening Example 2",
+            "audio_field": "Example 2 Audio",
         },
         "Example 3": {
             "query": r'''"note:Chinese (advanced)\_" "example 3:_*"''',
             "tag_prefix": "duplicate-audio::example3::",
             "card_name": "Listening Example 3",
+            "audio_field": "Example 3 Audio",
         },
         "中文": {
             "query": r'''"note:Chinese Grammar Wiki" 中文:_*''',
             "tag_prefix": "duplicate-audio::chinese-grammar-wiki::",
             "card_name": "Listening Translation",
+            "audio_field": "中文 audio",
         },
         "Hanzi": {
             "query": r'''note:SpoonFedNote Hanzi:_*''',
             "tag_prefix": "duplicate-audio::spoon-fed-chinese::",
             "card_name": "Listening",
+            "audio_field": "Audio",
         },
     }
     for field in conf.keys():
@@ -80,10 +85,15 @@ def process_cards():
         for (text, notes) in conf[field]['chinese_to_notes'].items():
             remaining_fields = fields[fields.index(field)+1:]
             # Reverse remaining fields
-            for d in [conf[f]['chinese_to_notes'] for f in remaining_fields][::-1]:
+            remaining_fields_rev = remaining_fields[::-1]
+            for f, d in zip(remaining_fields_rev, [conf[f_]['chinese_to_notes'] for f_ in remaining_fields_rev]):
                 if text in d:
                     canonical_nid = d[text][0]
                     logger.warn(f"Example 1 {text} on notes {notes} has duplicate in SpoonFedNote {canonical_nid}")
+                    canonical_note = col.get_note(canonical_nid)
+                    canonical_audio_field = conf[f]['audio_field']
+                    canonical_audio = canonical_note[canonical_audio_field]
+                    logging.warning(f'canonical note audio: {canonical_audio}')
                     for nid in notes:
                         note = col.get_note(nid)
                         tag_prefix = conf[field]['tag_prefix']
@@ -97,6 +107,14 @@ def process_cards():
                             logging.warning(f'Adding tag {tag} to nid:{nid}')
                             note.add_tag(tag)
                             logging.warning(f'Now tags are {note.string_tags()}')
+                        # Add audio even to notes corresponding to duplicate
+                        # cards, so that all notes with a given text share the
+                        # same audio file.
+                        audio_field = conf[field]['audio_field']
+                        if canonical_audio and not note[audio_field]:
+                            note[audio_field] = canonical_audio
+                        # Tags and audio must be saved to collection for
+                        # following search to work correctly
                         col.update_note(note)
                         cards = col.find_cards(f'''nid:{nid} "card:{conf[field]['card_name']}" -is:suspended''')
                         logger.warning(f'Suspending Card ids {cards}')
