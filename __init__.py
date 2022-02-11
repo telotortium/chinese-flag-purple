@@ -14,9 +14,10 @@ import sys
 
 import logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-# define a Handler which writes INFO messages or higher to the sys.stderr
-console = logging.StreamHandler()
+logger.setLevel(logging.INFO)
+# define a Handler which writes DEBUG messages or higher to sys.stdout (console
+# output when Anki is run from a console).
+console = logging.StreamHandler(stream=sys.stdout)
 console.setLevel(logging.DEBUG)
 # set a format which is simpler for console use
 formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
@@ -24,6 +25,19 @@ formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
 console.setFormatter(formatter)
 # add the handler to the root logger
 logger.addHandler(console)
+
+# define a Handler which writes INFO messages or higher to sys.stderr
+# (debug console in Anki GUI)
+console = logging.StreamHandler(stream=sys.stderr)
+console.setLevel(logging.INFO)
+# set a format which is simpler for console use
+formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+# tell the handler to use this format
+console.setFormatter(formatter)
+# add the handler to the root logger
+logger.addHandler(console)
+
+logger.debug("chinese-flag-purple loaded")
 
 EXTRACT_CHINESE_RE = re.compile(r'^(.*?)<br/?><br/?>.*')
 REMOVE_TONE_SPAN_RE = re.compile(r'<span class="tone\d">(.*?)</span>')
@@ -36,6 +50,7 @@ def extract_chinese_from_example(example):
     return example
 
 def process_cards():
+    logger.debug("entering process_cards")
     col = mw.window().col
     conf = {
         "Example 1": {
@@ -107,15 +122,15 @@ def process_cards():
                                 break
                         if not has_tag:
                             tag = f"{tag_prefix}{canonical_nid}"
-                            logging.warning(f'Adding tag {tag} to nid:{nid}')
+                            logging.info(f'Adding tag {tag} to nid:{nid}')
                             note.add_tag(tag)
-                            logging.warning(f'Now tags are {note.string_tags()}')
+                            logging.info(f'Now tags are {note.string_tags()}')
                         # Add audio even to notes corresponding to duplicate
                         # cards, so that all notes with a given text share the
                         # same audio file.
                         audio_field = conf[field]['audio_field']
                         if canonical_audio and not note[audio_field]:
-                            logging.warning(f"Copying audio {canonical_audio} from field {canonical_audio_field} on {canonical_nid} "
+                            logging.info(f"Copying audio {canonical_audio} from field {canonical_audio_field} on {canonical_nid} "
                                              "to {audio_field} on note {nid}")
                             note[audio_field] = canonical_audio
                         # Tags and audio must be saved to collection for
@@ -123,27 +138,28 @@ def process_cards():
                         col.update_note(note)
                         cards = col.find_cards(f'''nid:{nid} "card:{conf[field]['card_name']}" -(is:suspended flag:7)''')
                         if len(cards) > 0:
-                            logger.warning(f'Suspending and purple flagging Card ids {cards}')
+                            logger.info(f'Suspending and purple flagging Card ids {cards}')
                             col.sched.suspend_cards(cards)
                             col.set_user_flag_for_cards(7, cards)  # 7 = purple
-                            col.update_cards(cards)
-    col.flush()
+                            col.update_cards(col.get_card(c) for c in cards)
+    logger.info("Chinese Purple Flag tool complete")
 
 
 
 def fix_tags():
+    logger.debug("entering fix_tags")
     col = mw.window().col
     all_tags = col.tags.all()
-    logger.warning(f'All tags: {all_tags}')
+    logger.info(f'All tags: {all_tags}')
     for tag in all_tags:
         if tag.startswith('duplicate-audio__'):
-            logger.warning(f'Removing tag {tag}')
+            logger.info(f'Removing tag {tag}')
             col.tags.remove(tag)
         if re.match(r'^duplicate-audio:[^:].*', tag):
             new_tag = re.sub(r':', '::', tag)
-            logger.warning(f'Renaming tag {tag} to {new_tag}')
+            logger.info(f'Renaming tag {tag} to {new_tag}')
             col.tags.rename(tag, new_tag)
-    col.flush()
+    logger.info("Chinese Purple Flag Fix tags tool complete")
 
 
 def createMenu():
