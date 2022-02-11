@@ -13,7 +13,7 @@ import re
 import sys
 
 import logging
-logger = logging.getLogger("chinese_purple_flag")
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 # define a Handler which writes INFO messages or higher to the sys.stderr
 console = logging.StreamHandler()
@@ -83,18 +83,21 @@ def process_cards():
     fields = ["Example 1", "Example 2", "Example 3", "中文", "Hanzi"]
     for field in fields:
         for (text, notes) in conf[field]['chinese_to_notes'].items():
-            remaining_fields = fields[fields.index(field)+1:]
+            remaining_fields = fields[fields.index(field):]
+            logger.debug(f"Processing {text} in notes {notes}")
             # Reverse remaining fields
             remaining_fields_rev = remaining_fields[::-1]
             for f, d in zip(remaining_fields_rev, [conf[f_]['chinese_to_notes'] for f_ in remaining_fields_rev]):
                 if text in d:
                     canonical_nid = d[text][0]
-                    logger.warn(f"Example 1 {text} on notes {notes} has duplicate in SpoonFedNote {canonical_nid}")
+                    if field != f and not (len(notes) == 1 and notes[0] == canonical_nid):
+                        logger.debug(f"Field {field} {text} on notes {notes} has duplicate in field {f} on {canonical_nid}")
                     canonical_note = col.get_note(canonical_nid)
                     canonical_audio_field = conf[f]['audio_field']
                     canonical_audio = canonical_note[canonical_audio_field]
-                    logging.warning(f'canonical note audio: {canonical_audio}')
                     for nid in notes:
+                        if nid == canonical_nid:
+                            continue
                         note = col.get_note(nid)
                         tag_prefix = conf[field]['tag_prefix']
                         has_tag = False
@@ -112,17 +115,18 @@ def process_cards():
                         # same audio file.
                         audio_field = conf[field]['audio_field']
                         if canonical_audio and not note[audio_field]:
+                            logging.warning(f"Copying audio {canonical_audio} from field {canonical_audio_field} on {canonical_nid} "
+                                             "to {audio_field} on note {nid}")
                             note[audio_field] = canonical_audio
                         # Tags and audio must be saved to collection for
                         # following search to work correctly
                         col.update_note(note)
-                        cards = col.find_cards(f'''nid:{nid} "card:{conf[field]['card_name']}" -is:suspended''')
-                        logger.warning(f'Suspending Card ids {cards}')
-                        col.sched.suspend_cards(cards)
-                        for cid in cards:
-                            card = col.get_card(cid)
-                            card.set_user_flag(7)  # purple
-                            col.update_card(card)
+                        cards = col.find_cards(f'''nid:{nid} "card:{conf[field]['card_name']}" -(is:suspended flag:7)''')
+                        if len(cards) > 0:
+                            logger.warning(f'Suspending and purple flagging Card ids {cards}')
+                            col.sched.suspend_cards(cards)
+                            col.set_user_flag_for_cards(7, cards)  # 7 = purple
+                            col.update_cards(cards)
     col.flush()
 
 
