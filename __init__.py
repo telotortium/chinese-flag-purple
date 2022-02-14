@@ -7,10 +7,12 @@
 # Finds duplicate audio notes, and marks them, suspending the duplicates with
 # a purple flag (hence the name).
 
-from aqt import mw
-from aqt.qt import *
+import aqt
 import re
 import sys
+
+from aqt import mw
+from aqt.qt import *
 
 import logging
 logger = logging.getLogger(__name__)
@@ -170,5 +172,20 @@ def createMenu():
     a = QAction("Chinese Purple Flag Fix tags", mw)
     a.triggered.connect(fix_tags)
     mw.form.menuTools.addAction(a)
+
+    def browserMenusInit(browser: aqt.browser.Browser):
+        menu = QMenu("Chinese Purple Flag", browser.form.menubar)
+        browser.form.menubar.addMenu(menu)
+
+        a = QAction("Chinese Purple Flag", browser)
+        a.triggered.connect(process_cards)
+        menu.addAction(a)
+
+        a = QAction("Chinese Purple Flag Fix tags", browser)
+        a.triggered.connect(fix_tags)
+        menu.addAction(a)
+
+    # browser menus
+    aqt.gui_hooks.browser_menus_did_init.append(browserMenusInit)
 
 createMenu()
