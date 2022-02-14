@@ -132,9 +132,13 @@ def process_cards():
                         # same audio file.
                         audio_field = conf[field]['audio_field']
                         if canonical_audio and not note[audio_field]:
-                            logging.info(f"Copying audio {canonical_audio} from field {canonical_audio_field} on {canonical_nid} "
+                            logging.info(f"Copying audio {canonical_audio} from field {canonical_audio_field} on note {canonical_nid} "
                                              "to {audio_field} on note {nid}")
                             note[audio_field] = canonical_audio
+                        if note[audio_field] and not canonical_audio:
+                            logging.info(f"Copying audio {note[audio_field]} from field {audio_field} on note {nid} "
+                                             "to {canonical_audio_field} on note {canonical_nid}")
+                            canonical_note[canonical_audio_field] = note[audio_field]
                         # Tags and audio must be saved to collection for
                         # following search to work correctly
                         col.update_note(note)
