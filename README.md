@@ -1,4 +1,4 @@
-# Chinese Flag purple
+# Chinese Flag Purple
 
 Suspends duplicate audio cards.
 

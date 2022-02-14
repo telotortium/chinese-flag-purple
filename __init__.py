@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Chinese Purple Flag
+# Chinese Flag Purple
 # Anki 2 addon
 # Author telotortium
 # https://telotortium.github.io/
@@ -144,7 +144,7 @@ def process_cards():
                             col.sched.suspend_cards(cards)
                             col.set_user_flag_for_cards(7, cards)  # 7 = purple
                             col.update_cards(col.get_card(c) for c in cards)
-    logger.info("Chinese Purple Flag tool complete")
+    logger.info("Chinese Flag Purple tool complete")
 
 
 
@@ -161,27 +161,27 @@ def fix_tags():
             new_tag = re.sub(r':', '::', tag)
             logger.info(f'Renaming tag {tag} to {new_tag}')
             col.tags.rename(tag, new_tag)
-    logger.info("Chinese Purple Flag Fix tags tool complete")
+    logger.info("Chinese Flag Purple Fix tags tool complete")
 
 
 def createMenu():
-    a = QAction("Chinese Purple Flag", mw)
+    a = QAction("Chinese Flag Purple", mw)
     a.triggered.connect(process_cards)
     mw.form.menuTools.addAction(a)
 
-    a = QAction("Chinese Purple Flag Fix tags", mw)
+    a = QAction("Chinese Flag Purple Fix tags", mw)
     a.triggered.connect(fix_tags)
     mw.form.menuTools.addAction(a)
 
     def browserMenusInit(browser: aqt.browser.Browser):
-        menu = QMenu("Chinese Purple Flag", browser.form.menubar)
+        menu = QMenu("Chinese Flag Purple", browser.form.menubar)
         browser.form.menubar.addMenu(menu)
 
-        a = QAction("Chinese Purple Flag", browser)
+        a = QAction("Chinese Flag Purple", browser)
         a.triggered.connect(process_cards)
         menu.addAction(a)
 
-        a = QAction("Chinese Purple Flag Fix tags", browser)
+        a = QAction("Chinese Flag Purple Fix tags", browser)
         a.triggered.connect(fix_tags)
         menu.addAction(a)
 
