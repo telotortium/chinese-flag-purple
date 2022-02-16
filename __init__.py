@@ -97,57 +97,74 @@ def process_cards():
             nids.append(nid)
             d[text] = nids
 
+    text_to_notes = dict()
     fields = ["Example 1", "Example 2", "Example 3", "中文", "Hanzi"]
     for field in fields:
-        for (text, notes) in conf[field]['chinese_to_notes'].items():
-            remaining_fields = fields[fields.index(field):]
-            logger.debug(f"Processing {text} in notes {notes}")
-            # Reverse remaining fields
-            remaining_fields_rev = remaining_fields[::-1]
-            for f, d in zip(remaining_fields_rev, [conf[f_]['chinese_to_notes'] for f_ in remaining_fields_rev]):
-                if text in d:
-                    canonical_nid = d[text][0]
-                    if field != f and not (len(notes) == 1 and notes[0] == canonical_nid):
-                        logger.debug(f"Field {field} {text} on notes {notes} has duplicate in field {f} on {canonical_nid}")
-                    canonical_note = col.get_note(canonical_nid)
-                    canonical_audio_field = conf[f]['audio_field']
-                    canonical_audio = canonical_note[canonical_audio_field]
-                    for nid in notes:
-                        if nid == canonical_nid:
-                            continue
-                        note = col.get_note(nid)
-                        tag_prefix = conf[field]['tag_prefix']
-                        has_tag = False
-                        for tag in note.tags:
-                            if tag.startswith(tag_prefix):
-                                has_tag = True
-                                break
-                        if not has_tag:
-                            tag = f"{tag_prefix}{canonical_nid}"
-                            logging.info(f'Adding tag {tag} to nid:{nid}')
-                            note.add_tag(tag)
-                            logging.info(f'Now tags are {note.string_tags()}')
-                        # Add audio even to notes corresponding to duplicate
-                        # cards, so that all notes with a given text share the
-                        # same audio file.
-                        audio_field = conf[field]['audio_field']
-                        if canonical_audio and not note[audio_field]:
-                            logging.info(f"Copying audio {canonical_audio} from field {canonical_audio_field} on note {canonical_nid} "
-                                             "to {audio_field} on note {nid}")
-                            note[audio_field] = canonical_audio
-                        if note[audio_field] and not canonical_audio:
-                            logging.info(f"Copying audio {note[audio_field]} from field {audio_field} on note {nid} "
-                                             "to {canonical_audio_field} on note {canonical_nid}")
-                            canonical_note[canonical_audio_field] = note[audio_field]
-                        # Tags and audio must be saved to collection for
-                        # following search to work correctly
-                        col.update_note(note)
-                        cards = col.find_cards(f'''nid:{nid} "card:{conf[field]['card_name']}" -(is:suspended flag:7)''')
-                        if len(cards) > 0:
-                            logger.info(f'Suspending and purple flagging Card ids {cards}')
-                            col.sched.suspend_cards(cards)
-                            col.set_user_flag_for_cards(7, cards)  # 7 = purple
-                            col.update_cards(col.get_card(c) for c in cards)
+        for (text, nids) in conf[field]['chinese_to_notes'].items():
+            xs = text_to_notes.get(text, [])
+            for nid in nids:
+                xs.append((field, nid))
+            text_to_notes[text] = xs
+
+    for (text, field_to_nid_list) in text_to_notes.items():
+        note_to_audio_list = []
+        for (field, nid) in field_to_nid_list:
+            audio_field = conf[field]['audio_field']
+            note = col.get_note(nid)
+            note_to_audio_list.append((note, audio_field, note[audio_field]))
+        audios = list(frozenset(a[2] for a in note_to_audio_list
+            if a[2] is not None and a[2] != ""))
+        if len(audios) == 0:
+            logger.warn(f"No audio on any notes for text {text}")
+        elif len(audios) > 1:
+            logger.warn(f"Text {text} has too many audios: {audios}")
+        else:
+            for (note, audio_field, audio) in note_to_audio_list:
+                if audio != audios[0]:
+                    logger.info(f"Adding audio {audios[0]} to {audio_field} on note {note.id}")
+                    note[audio_field] = audios[0]
+                    col.update_note(note)
+
+
+    def find_and_process_duplicates(fields):
+        for field in fields:
+            for (text, notes) in conf[field]['chinese_to_notes'].items():
+                remaining_fields = fields[fields.index(field):]
+                logger.debug(f"Processing {text} in notes {notes}")
+                # Reverse remaining fields
+                remaining_fields_rev = remaining_fields[::-1]
+                for f, d in zip(remaining_fields_rev, [conf[f_]['chinese_to_notes'] for f_ in remaining_fields_rev]):
+                    if text in d:
+                        canonical_nid = d[text][0]
+                        if field != f and not (len(notes) == 1 and notes[0] == canonical_nid):
+                            logger.debug(f"Field {field} {text} on notes {notes} has duplicate in field {f} on {canonical_nid}")
+                        canonical_note = col.get_note(canonical_nid)
+                        for nid in notes:
+                            if nid == canonical_nid:
+                                continue
+                            note = col.get_note(nid)
+                            tag_prefix = conf[field]['tag_prefix']
+                            has_tag = False
+                            for tag in note.tags:
+                                if tag.startswith(tag_prefix):
+                                    has_tag = True
+                                    break
+                            if not has_tag:
+                                tag = f"{tag_prefix}{canonical_nid}"
+                                logging.info(f'Adding tag {tag} to nid:{nid}')
+                                note.add_tag(tag)
+                                logging.info(f'Now tags are {note.string_tags()}')
+                            # Tags must be saved to collection for
+                            # following search to work correctly
+                            col.update_note(note)
+                            cards = col.find_cards(f'''nid:{nid} "card:{conf[field]['card_name']}" -(is:suspended flag:7)''')
+                            if len(cards) > 0:
+                                logger.info(f'Suspending and purple flagging Card ids {cards}')
+                                col.sched.suspend_cards(cards)
+                                col.set_user_flag_for_cards(7, cards)  # 7 = purple
+                                col.update_cards(col.get_card(c) for c in cards)
+    logger.info(f"find_and_process_duplicates(fields={fields})")
+    find_and_process_duplicates(fields=fields)
     logger.info("Chinese Flag Purple tool complete")
 
 
