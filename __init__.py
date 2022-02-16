@@ -116,14 +116,24 @@ def process_cards():
             if a[2] is not None and a[2] != ""))
         if len(audios) == 0:
             logger.warn(f"No audio on any notes for text {text}")
+            continue
         elif len(audios) > 1:
-            logger.warn(f"Text {text} has too many audios: {audios}")
-        else:
-            for (note, audio_field, audio) in note_to_audio_list:
-                if audio != audios[0]:
-                    logger.info(f"Adding audio {audios[0]} to {audio_field} on note {note.id}")
-                    note[audio_field] = audios[0]
-                    col.update_note(note)
+            logger.warn(f"Text {text} has too many audios: {audios}. Will select a single audio for all notes...")
+            def audios_key(audio):
+                if audio.find("sound:hypertts-") != -1:
+                    return 1
+                elif audio.find("sound:googletts-") != -1:
+                    return 0
+                else:
+                    return 2
+            audios.sort(key=audios_key, reverse=True)
+        canonical_audio = audios[0]
+
+        for (note, audio_field, audio) in note_to_audio_list:
+            if audio != audios[0]:
+                logger.info(f"Adding audio {audios[0]} to {audio_field} on note {note.id}")
+                note[audio_field] = audios[0]
+                col.update_note(note)
 
 
     def find_and_process_duplicates(fields):
